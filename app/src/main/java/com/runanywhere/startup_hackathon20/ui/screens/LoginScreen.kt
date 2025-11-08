@@ -3,11 +3,13 @@ package com.runanywhere.startup_hackathon20.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -28,9 +30,10 @@ fun LoginScreen(
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF6366F1),
-                        Color(0xFF8B5CF6),
-                        Color(0xFFEC4899)
+                        Color(0xFF1A0F0A),
+                        Color(0xFF2C1810),
+                        Color(0xFF3D2417),
+                        Color(0xFF4A2F1F)
                     )
                 )
             )
@@ -44,7 +47,7 @@ fun LoginScreen(
         ) {
             // Logo/Title
             Text(
-                text = "🎓",
+                text = "🏰",
                 fontSize = 72.sp,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -53,23 +56,23 @@ fun LoginScreen(
                 text = "EduVenture",
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = Color(0xFFFFD700),
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Text(
-                text = "Gamified Learning Reimagined",
+                text = "Embark on Your Learning Quest",
                 fontSize = 18.sp,
-                color = Color.White.copy(alpha = 0.9f),
+                color = Color(0xFFC0C0C0),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 48.dp)
             )
 
             // Role Selection Cards
             RoleSelectionCard(
-                title = "Student",
-                icon = "📚",
-                description = "Embark on learning quests, earn XP, and unlock achievements",
+                title = "Student Knight",
+                icon = "⚔️",
+                description = "Embark on learning quests, earn XP, and unlock legendary achievements",
                 onClick = {
                     viewModel.loginAsStudent()
                     onLoginAsStudent()
@@ -79,9 +82,9 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             RoleSelectionCard(
-                title = "Teacher",
-                icon = "👩‍🏫",
-                description = "Access professional development and track student progress",
+                title = "Master Teacher",
+                icon = "🎓",
+                description = "Guide young knights, access development courses, and track their progress",
                 onClick = {
                     viewModel.loginAsTeacher()
                     onLoginAsTeacher()
@@ -106,7 +109,7 @@ fun RoleSelectionCard(
             .height(140.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = Color(0xFF2C1810)
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = if (isPressed) 2.dp else 8.dp
@@ -119,18 +122,35 @@ fun RoleSelectionCard(
                 .padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = icon,
-                fontSize = 48.sp,
-                modifier = Modifier.padding(end = 20.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFFD700),
+                                Color(0xFFDAA520),
+                                Color(0xFF8B4513)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = icon,
+                    fontSize = 32.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(20.dp))
 
             Column {
                 Text(
                     text = title,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1F2937)
+                    color = Color(0xFFFFD700)
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -138,7 +158,7 @@ fun RoleSelectionCard(
                 Text(
                     text = description,
                     fontSize = 14.sp,
-                    color = Color(0xFF6B7280),
+                    color = Color(0xFFC0C0C0),
                     lineHeight = 20.sp
                 )
             }

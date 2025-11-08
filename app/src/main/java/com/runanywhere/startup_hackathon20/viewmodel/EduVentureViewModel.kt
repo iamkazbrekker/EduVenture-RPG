@@ -3,6 +3,8 @@ package com.runanywhere.startup_hackathon20.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+
+
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.listAvailableModels
 import com.runanywhere.sdk.models.ModelInfo
@@ -14,6 +16,8 @@ import com.runanywhere.startup_hackathon20.data.repository.RPGRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
+
+
 
 class EduVentureViewModel(private val context: Context) : ViewModel() {
 
@@ -118,6 +122,24 @@ class EduVentureViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    // Teacher Authentication
+    suspend fun loginTeacher(teacherId: String, password: String): Boolean {
+        return try {
+            // For now, use hardcoded teacher credentials
+            // TODO: Implement proper teacher authentication with database
+            if (teacherId == "TEACH001" && password == "master123") {
+                _loginError.value = null
+                true
+            } else {
+                _loginError.value = "Invalid Teacher ID or Password"
+                false
+            }
+        } catch (e: Exception) {
+            _loginError.value = "Login failed: ${e.message}"
+            false
+        }
+    }
+
     fun completeModule(moduleId: String) {
         viewModelScope.launch {
             rpgRepository.completeModule(moduleId)
@@ -177,7 +199,7 @@ class EduVentureViewModel(private val context: Context) : ViewModel() {
             try {
                 _selectedPDF.value = driveFile
                 _statusMessage.value = "Loading PDF: ${driveFile.name}..."
-                val text = driveHelper?.extractTextFromPDF(driveFile.id) ?: ""
+                val text = driveHelper?.extractTextFromPDF(driveFile.id, driveFile.webLink) ?: ""
                 _pdfContent.value = text
                 _statusMessage.value = "PDF loaded - Ask me to summarize it!"
             } catch (e: Exception) {
@@ -468,6 +490,19 @@ class EduVentureViewModel(private val context: Context) : ViewModel() {
 
     fun refreshModels() {
         loadAvailableModels()
+    }
+
+    // Database Management
+    fun resetDatabase() {
+        viewModelScope.launch {
+            try {
+                _statusMessage.value = "Resetting database..."
+                rpgRepository.resetDatabase()
+                _statusMessage.value = "Database reset complete! Demo accounts restored."
+            } catch (e: Exception) {
+                _statusMessage.value = "Error resetting database: ${e.message}"
+            }
+        }
     }
 
     // Achievement System

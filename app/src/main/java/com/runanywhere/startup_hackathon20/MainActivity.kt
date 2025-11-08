@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
 sealed class Screen {
     object RoleSelection : Screen()
     object StudentLogin : Screen()
+    object TeacherLogin : Screen()
     object StudentHome : Screen()
     object TeacherHome : Screen()
 }
@@ -70,8 +71,7 @@ fun EduVentureApp() {
                     currentScreen = Screen.StudentLogin
                 },
                 onLoginAsTeacher = {
-                    viewModel.loginAsTeacher()
-                    currentScreen = Screen.TeacherHome
+                    currentScreen = Screen.TeacherLogin
                 }
             )
         }
@@ -84,6 +84,21 @@ fun EduVentureApp() {
                         val success = viewModel.loginStudent(studentId, password)
                         if (success) {
                             currentScreen = Screen.StudentHome
+                        }
+                    }
+                },
+                errorMessage = loginError
+            )
+        }
+
+        Screen.TeacherLogin -> {
+            TeacherLoginScreen(
+                onBack = { currentScreen = Screen.RoleSelection },
+                onLogin = { teacherId, password ->
+                    coroutineScope.launch {
+                        val success = viewModel.loginTeacher(teacherId, password)
+                        if (success) {
+                            currentScreen = Screen.TeacherHome
                         }
                     }
                 },

@@ -23,8 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 import com.runanywhere.startup_hackathon20.data.models.*
 import com.runanywhere.startup_hackathon20.viewmodel.EduVentureViewModel
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,14 +96,14 @@ fun RPGTeacherScreenWithNav(
                 NavigationBarItem(
                     icon = {
                         Icon(
-                            Icons.Default.Star,
-                            "Classes",
+                            Icons.Default.Person,
+                            "Students",
                             tint = if (selectedTab == 1) Color(0xFFFFD700) else Color(0xFF8B7355)
                         )
                     },
                     label = {
                         Text(
-                            "Classes",
+                            "Students",
                             color = if (selectedTab == 1) Color(0xFFFFD700) else Color(0xFF8B7355),
                             fontSize = 11.sp
                         )
@@ -119,14 +121,15 @@ fun RPGTeacherScreenWithNav(
 
                 NavigationBarItem(
                     icon = {
-                        Text(
-                            "🤖",
-                            fontSize = 24.sp
+                        Icon(
+                            Icons.Default.Menu,
+                            "Resources",
+                            tint = if (selectedTab == 2) Color(0xFFFFD700) else Color(0xFF8B7355)
                         )
                     },
                     label = {
                         Text(
-                            "AI Mentor",
+                            "Resources",
                             color = if (selectedTab == 2) Color(0xFFFFD700) else Color(0xFF8B7355),
                             fontSize = 11.sp
                         )
@@ -145,14 +148,14 @@ fun RPGTeacherScreenWithNav(
                 NavigationBarItem(
                     icon = {
                         Icon(
-                            Icons.Default.Menu,
-                            "Resources",
+                            Icons.Default.DateRange,
+                            "Timetables",
                             tint = if (selectedTab == 3) Color(0xFFFFD700) else Color(0xFF8B7355)
                         )
                     },
                     label = {
                         Text(
-                            "Resources",
+                            "Timetables",
                             color = if (selectedTab == 3) Color(0xFFFFD700) else Color(0xFF8B7355),
                             fontSize = 11.sp
                         )
@@ -171,7 +174,7 @@ fun RPGTeacherScreenWithNav(
                 NavigationBarItem(
                     icon = {
                         Icon(
-                            Icons.Default.Person,
+                            Icons.Default.Settings,
                             "Profile",
                             tint = if (selectedTab == 4) Color(0xFFFFD700) else Color(0xFF8B7355)
                         )
@@ -207,9 +210,9 @@ fun RPGTeacherScreenWithNav(
                     }
                 )
 
-                1 -> RPGClassesTab(classRooms = classRooms)
-                2 -> TeacherAIChatScreen(viewModel = viewModel)
-                3 -> RPGResourcesTab(resources = sharedResources)
+                1 -> RPGStudentsTab(classRooms = classRooms)
+                2 -> RPGResourcesTab(resources = sharedResources)
+                3 -> RPGClassTimetablesTab(classRooms = classRooms)
                 4 -> RPGTeacherProfile(user = user, onLogout = onLogout)
             }
         }
@@ -272,75 +275,17 @@ fun RPGTeacherDashboard(
                     TeacherStatsOverview(classRooms)
                 }
 
-                // New Feature Cards Section
+                // Professional Development
                 item {
                     Text(
-                        "⚔️ Master Tools",
+                        "📚 Professional Development",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFFD700)
                     )
                 }
 
-                // Feature Grid
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TeacherFeatureCard(
-                            icon = "🎓",
-                            title = "Tech Development Courses",
-                            description = "Latest technology courses for modern teaching",
-                            onClick = { onFeatureClick("tech_courses") }
-                        )
-
-                        TeacherFeatureCard(
-                            icon = "📚",
-                            title = "Resource Hub",
-                            description = "Curated learning resources and external links",
-                            onClick = { onFeatureClick("resource_hub") }
-                        )
-
-                        TeacherFeatureCard(
-                            icon = "📊",
-                            title = "Student Performance Insights",
-                            description = "AI-powered performance analytics and recommendations",
-                            onClick = { onFeatureClick("student_insights") }
-                        )
-
-                        TeacherFeatureCard(
-                            icon = "📈",
-                            title = "Progress Dashboard",
-                            description = "Interactive class-wide analytics and alerts",
-                            onClick = { onFeatureClick("progress_dashboard") }
-                        )
-                    }
-                }
-
-                // Classes Section
-                item {
-                    Text(
-                        "🏛️ Your Classes",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFD700)
-                    )
-                }
-
-                items(classRooms.take(3)) { classroom ->
-                    RPGClassRoomCard(classroom)
-                }
-
-                // Professional Development
-                item {
-                    Text(
-                        "📚 Professional Development",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFD700),
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                items(teacherCourses.take(2)) { course ->
+                items(teacherCourses) { course ->
                     RPGTeacherCourseCard(course)
                 }
             }
@@ -757,13 +702,13 @@ fun RPGTeacherCourseCard(course: TeacherCourse) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RPGClassesTab(classRooms: List<ClassRoom>) {
+fun RPGStudentsTab(classRooms: List<ClassRoom>) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        "🏛️ Training Halls",
+                        "👥 Students",
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -942,13 +887,13 @@ fun RPGStudentProgressCard(student: StudentProgress) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TeacherAIChatScreen(viewModel: EduVentureViewModel) {
+fun RPGClassTimetablesTab(classRooms: List<ClassRoom>) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        "🤖 AI Teaching Mentor",
+                        "🕒 Class Timetables",
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -966,32 +911,22 @@ fun TeacherAIChatScreen(viewModel: EduVentureViewModel) {
                     brush = Brush.verticalGradient(
                         colors = listOf(
                             Color(0xFF1A0F0A),
-                            Color(0xFF2C1810)
+                            Color(0xFF2C1810),
+                            Color(0xFF3D2417)
                         )
                     )
                 )
-                .padding(padding),
-            contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("🤖", fontSize = 64.sp)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "AI Teaching Mentor",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFFD700)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Your AI assistant for lesson planning, student insights, and teaching strategies",
-                    fontSize = 14.sp,
-                    color = Color(0xFFC0C0C0),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
+                items(classRooms) { classroom ->
+                    RPGClassDetailCard(classroom)
+                }
             }
         }
     }

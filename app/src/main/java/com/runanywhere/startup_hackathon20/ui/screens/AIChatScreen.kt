@@ -669,8 +669,6 @@ fun PDFSelectorPanel(
     onSetFolderId: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
-    var folderIdInput by remember { mutableStateOf("") }
-
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color(0xFF4A2F1F),
@@ -679,46 +677,20 @@ fun PDFSelectorPanel(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                "📚 Study Notes from Drive",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFFFD700)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Folder ID Input
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = folderIdInput,
-                    onValueChange = { folderIdInput = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Enter Drive Folder ID", fontSize = 12.sp) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF2C1810),
-                        unfocusedContainerColor = Color(0xFF2C1810),
-                        disabledContainerColor = Color(0xFF2C1810),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color(0xFFFFD700),
-                        focusedBorderColor = Color(0xFFFFD700),
-                        unfocusedBorderColor = Color(0xFF8B7355)
-                    ),
-                    singleLine = true
+                Text(
+                    "📚 Study Notes from Drive",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFFD700)
                 )
 
-                Button(
-                    onClick = { onSetFolderId(folderIdInput) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFD700)
-                    )
-                ) {
-                    Text("Load", color = Color(0xFF2C1810))
+                TextButton(onClick = onRefresh) {
+                    Text("Refresh", color = Color(0xFFFFD700))
                 }
             }
 
@@ -772,10 +744,9 @@ fun PDFSelectorPanel(
                 Text(
                     "Available Notes (${availablePDFs.size})",
                     fontSize = 14.sp,
-                    color = Color(0xFFC0C0C0)
+                    color = Color(0xFFC0C0C0),
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 availablePDFs.take(5).forEach { pdf ->
                     Card(
@@ -815,12 +786,45 @@ fun PDFSelectorPanel(
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TextButton(onClick = onRefresh) {
-                Text("Refresh PDFs", color = Color(0xFFFFD700))
+                if (availablePDFs.size > 5) {
+                    Text(
+                        "+${availablePDFs.size - 5} more files...",
+                        fontSize = 12.sp,
+                        color = Color(0xFF8B7355),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF2C1810)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("📂", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "No PDFs Found",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFD700)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Make sure your Drive folder is publicly accessible",
+                            fontSize = 12.sp,
+                            color = Color(0xFFC0C0C0),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
             }
         }
     }

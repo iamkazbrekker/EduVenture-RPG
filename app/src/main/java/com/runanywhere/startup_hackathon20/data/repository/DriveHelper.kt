@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URL
 
 class DriveHelper(private val context: Context) {
 
@@ -24,10 +25,30 @@ class DriveHelper(private val context: Context) {
     init {
         // Initialize PDFBox
         PDFBoxResourceLoader.init(context)
+        // Initialize with unauthenticated access for public folders
+        initializeUnauthenticatedDrive()
     }
 
     /**
-     * Initialize Google Drive service with user credentials
+     * Initialize Google Drive service without authentication for public folders
+     */
+    private fun initializeUnauthenticatedDrive() {
+        try {
+            driveService = Drive.Builder(
+                NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                null // No credentials for public access
+            )
+                .setApplicationName("EduVenture RPG")
+                .build()
+            Log.d("DriveHelper", "Drive service initialized for public access")
+        } catch (e: Exception) {
+            Log.e("DriveHelper", "Error initializing Drive: ${e.message}")
+        }
+    }
+
+    /**
+     * Initialize Google Drive service with user credentials (for private folders)
      */
     fun initializeDrive(accountName: String) {
         val credential = GoogleAccountCredential.usingOAuth2(
@@ -44,30 +65,42 @@ class DriveHelper(private val context: Context) {
         )
             .setApplicationName("EduVenture RPG")
             .build()
+
+        Log.d("DriveHelper", "Drive service initialized with account: $accountName")
     }
 
     /**
      * Fetch list of PDF files from a specific Google Drive folder
+     * Works with both public and authenticated folders
      */
     suspend fun fetchPDFsFromFolder(folderId: String): List<DriveFile> =
         withContext(Dispatchers.IO) {
             try {
+                Log.d("DriveHelper", "Fetching PDFs from folder: $folderId")
+
                 val result = driveService?.files()?.list()
                     ?.setQ("'$folderId' in parents and mimeType='application/pdf' and trashed=false")
-                    ?.setFields("files(id, name, modifiedTime, size)")
+                    ?.setFields("files(id, name, modifiedTime, size, webContentLink)")
                     ?.setOrderBy("modifiedTime desc")
                     ?.execute()
 
-                result?.files?.map { file ->
+                val files = result?.files?.map { file ->
+                    Log.d("DriveHelper", "Found PDF: ${file.name} (${file.id})")
                     DriveFile(
                         id = file.id,
                         name = file.name,
                         modifiedTime = file.modifiedTime?.value ?: 0,
-                        size = file.getSize() ?: 0
+                        size = file.getSize() ?: 0,
+                        webLink = file.webContentLink
                     )
                 } ?: emptyList()
+
+                Log.d("DriveHelper", "Total PDFs found: ${files.size}")
+                files
             } catch (e: Exception) {
-                Log.e("DriveHelper", "Error fetching PDFs: ${e.message}")
+                Log.e("DriveHelper", "Error fetching PDFs: ${e.message}", e)
+                Log.e("DriveHelper", "Folder ID: $folderId")
+                Log.e("DriveHelper", "Make sure the folder is publicly accessible")
                 emptyList()
             }
         }
@@ -75,14 +108,36 @@ class DriveHelper(private val context: Context) {
     /**
      * Download and extract text from a PDF file
      */
-    suspend fun extractTextFromPDF(fileId: String): String = withContext(Dispatchers.IO) {
+    suspend fun extractTextFromPDF(fileId: String, webLink: String? = null): String =
+        withContext(Dispatchers.IO) {
         // Check cache first
-        pdfCache[fileId]?.let { return@withContext it }
+        pdfCache[fileId]?.let {
+            Log.d("DriveHelper", "Returning cached PDF content for $fileId")
+            return@withContext it
+        }
 
         try {
+            Log.d("DriveHelper", "Downloading PDF: $fileId")
+
             // Download PDF file
             val outputStream = ByteArrayOutputStream()
-            driveService?.files()?.get(fileId)?.executeMediaAndDownloadTo(outputStream)
+
+            try {
+                // Try authenticated download first
+                driveService?.files()?.get(fileId)?.executeMediaAndDownloadTo(outputStream)
+            } catch (e: Exception) {
+                Log.w("DriveHelper", "Authenticated download failed, trying web link")
+                // If authenticated fails and we have a web link, try direct download
+                if (!webLink.isNullOrEmpty()) {
+                    val directLink = webLink.replace("/view?", "/uc?export=download&")
+                    val connection = URL(directLink).openConnection()
+                    connection.getInputStream().use { input ->
+                        input.copyTo(outputStream)
+                    }
+                } else {
+                    throw e
+                }
+            }
 
             // Save to temporary file
             val tempFile = File.createTempFile("pdf_", ".pdf", context.cacheDir)
@@ -90,6 +145,7 @@ class DriveHelper(private val context: Context) {
                 fos.write(outputStream.toByteArray())
             }
 
+            Log.d("DriveHelper", "Extracting text from PDF")
             // Extract text using PDFBox
             val document = PDDocument.load(tempFile)
             val stripper = PDFTextStripper()
@@ -102,10 +158,11 @@ class DriveHelper(private val context: Context) {
             // Cache the result
             pdfCache[fileId] = text
 
+            Log.d("DriveHelper", "Successfully extracted ${text.length} characters from PDF")
             text
         } catch (e: Exception) {
-            Log.e("DriveHelper", "Error extracting PDF text: ${e.message}")
-            "Error: Could not extract text from PDF. ${e.message}"
+            Log.e("DriveHelper", "Error extracting PDF text: ${e.message}", e)
+            "Error: Could not extract text from PDF. ${e.message}\n\nPlease ensure:\n1. The folder is publicly accessible\n2. PDFs have 'Anyone with the link' view permission\n3. You're connected to the internet"
         }
     }
 
@@ -148,5 +205,6 @@ data class DriveFile(
     val id: String,
     val name: String,
     val modifiedTime: Long,
-    val size: Long
+    val size: Long,
+    val webLink: String? = null
 )

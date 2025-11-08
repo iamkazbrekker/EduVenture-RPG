@@ -20,8 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.runanywhere.startup_hackathon20.BuildConfig
 import com.runanywhere.startup_hackathon20.data.models.KnightProfile
 import com.runanywhere.startup_hackathon20.viewmodel.EduVentureViewModel
+import kotlinx.coroutines.launch
 
 data class ProfileOption(
     val title: String,
@@ -44,6 +46,7 @@ fun ProfileDashboardScreen(
 ) {
     var showEditProfile by remember { mutableStateOf(false) }
     var showChangePassword by remember { mutableStateOf(false) }
+    var showResetConfirmation by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -176,6 +179,42 @@ fun ProfileDashboardScreen(
                 }
             }
 
+            // Debug Options
+            item {
+                if (BuildConfig.DEBUG) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF4A2F1F)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Text(
+                                "🔍 Debug Options",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD700),
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                            )
+
+                            ProfileOptionItem(
+                                icon = Icons.Default.Delete,
+                                title = "Reset Database",
+                                subtitle = "Clear all data and repopulate with demo accounts",
+                                onClick = {
+                                    showResetConfirmation = true
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             // Logout Button
             item {
                 Card(
@@ -235,6 +274,29 @@ fun ProfileDashboardScreen(
             onChangePassword = { old, new ->
                 viewModel.changePassword(old, new) { result ->
                     // Handle result - could show a toast or snackbar
+                }
+            }
+        )
+    }
+
+    if (showResetConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmation = false },
+            title = { Text("Reset Database") },
+            text = { Text("Are you sure you want to reset the database?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel?.resetDatabase()
+                        showResetConfirmation = false
+                    }
+                ) {
+                    Text("Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirmation = false }) {
+                    Text("Cancel")
                 }
             }
         )

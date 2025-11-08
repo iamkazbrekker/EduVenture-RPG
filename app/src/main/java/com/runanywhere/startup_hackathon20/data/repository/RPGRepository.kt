@@ -1,17 +1,21 @@
 package com.runanywhere.startup_hackathon20.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.runanywhere.startup_hackathon20.data.database.AppDatabase
 import com.runanywhere.startup_hackathon20.data.models.*
 import com.runanywhere.startup_hackathon20.utils.SecurityUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.UUID
+import kotlin.collections.isNotEmpty
+import kotlin.collections.toMutableList
 
 class RPGRepository(context: Context) {
 
     private val database = AppDatabase.getDatabase(context)
     private val studentDao = database.studentDao()
+    private val driveRouteService = DriveRouteService(context)
 
     private val _knightProfile = MutableStateFlow<KnightProfile?>(null)
     val knightProfile: StateFlow<KnightProfile?> = _knightProfile
@@ -19,24 +23,114 @@ class RPGRepository(context: Context) {
     private val _learningRoutes = MutableStateFlow<List<LearningRoute>>(emptyList())
     val learningRoutes: StateFlow<List<LearningRoute>> = _learningRoutes
 
-    // Hardcoded Google Drive folder ID
-    val DRIVE_FOLDER_ID = "1sFgl7wGTuAGWRsQi-sNYW4Me-VrKmD9J" // Replace with actual folder ID
+    private val _isDriveLoading = MutableStateFlow(false)
+    val isDriveLoading: StateFlow<Boolean> = _isDriveLoading
+
+    private val _driveError = MutableStateFlow<String?>(null)
+    val driveError: StateFlow<String?> = _driveError
+
+    // Google Drive folder ID - now managed by DriveRouteService
+    val DRIVE_FOLDER_ID = DriveRouteService.DRIVE_FOLDER_ID
 
     init {
         // Initialize with default routes if database is empty
     }
 
     suspend fun initializeDatabase() {
-        // Check if database has routes, if not, insert defaults
-        val routes = studentDao.getAllRoutes()
-        if (routes.isEmpty()) {
-            studentDao.insertAllRoutes(listOf(createMathRoute()))
-        }
+        try {
+            _isDriveLoading.value = true
+            _driveError.value = null
 
-        // Check if database has students, if not, create demo accounts
-        val students = studentDao.getLeaderboard()
-        if (students.isEmpty()) {
-            createDemoAccounts()
+            Log.d("RPGRepository", "Initializing database with Google Drive integration...")
+
+            // Try to fetch routes from Google Drive
+            val routesFromDrive = try {
+                driveRouteService.fetchLearningRoutesFromDrive()
+            } catch (e: Exception) {
+                Log.e("RPGRepository", "Error fetching from Drive: ${e.message}", e)
+                _driveError.value = "Failed to fetch from Drive: ${e.message}"
+                null
+            }
+
+            // Check if database has routes
+            val existingRoutes = studentDao.getAllRoutes()
+
+            if (routesFromDrive != null && routesFromDrive.isNotEmpty()) {
+                // We have routes from Drive - update database
+                Log.d(
+                    "RPGRepository",
+                    "Found ${routesFromDrive.size} routes from Drive, updating database..."
+                )
+                studentDao.insertAllRoutes(routesFromDrive)
+            } else if (existingRoutes.isEmpty()) {
+                // No routes from Drive and database is empty - use fallback
+                Log.w("RPGRepository", "No routes from Drive, using fallback route")
+                studentDao.insertAllRoutes(listOf(createFallbackMathRoute()))
+            } else {
+                // Use existing routes from database
+                Log.d("RPGRepository", "Using ${existingRoutes.size} existing routes from database")
+            }
+
+            // Check if database has students, if not, create demo accounts
+            val students = studentDao.getLeaderboard()
+            if (students.isEmpty()) {
+                createDemoAccounts()
+            }
+
+        } catch (e: Exception) {
+            Log.e("RPGRepository", "Error initializing database: ${e.message}", e)
+            _driveError.value = "Database initialization error: ${e.message}"
+        } finally {
+            _isDriveLoading.value = false
+        }
+    }
+
+    /**
+     * Manually refresh routes from Google Drive
+     */
+    suspend fun refreshRoutesFromDrive(): Result<List<LearningRoute>> {
+        return try {
+            _isDriveLoading.value = true
+            _driveError.value = null
+
+            Log.d("RPGRepository", "Manually refreshing routes from Drive...")
+            val routes = driveRouteService.fetchLearningRoutesFromDrive()
+
+            if (routes.isNotEmpty()) {
+                // Update database with fresh routes
+                studentDao.insertAllRoutes(routes)
+
+                // Reload routes for current student
+                _knightProfile.value?.let { knight ->
+                    loadRoutesForStudent(knight.id)
+                }
+
+                Log.d("RPGRepository", "Successfully refreshed ${routes.size} routes from Drive")
+                Result.success(routes)
+            } else {
+                val error = "No routes found in Drive"
+                _driveError.value = error
+                Result.failure(Exception(error))
+            }
+
+        } catch (e: Exception) {
+            Log.e("RPGRepository", "Error refreshing from Drive: ${e.message}", e)
+            _driveError.value = "Failed to refresh: ${e.message}"
+            Result.failure(e)
+        } finally {
+            _isDriveLoading.value = false
+        }
+    }
+
+    /**
+     * Check Drive connectivity
+     */
+    suspend fun checkDriveConnection(): Boolean {
+        return try {
+            driveRouteService.isDriveAccessible()
+        } catch (e: Exception) {
+            Log.e("RPGRepository", "Drive connection check failed: ${e.message}")
+            false
         }
     }
 
@@ -214,7 +308,10 @@ class RPGRepository(context: Context) {
         _learningRoutes.value = emptyList()
     }
 
-    private fun createMathRoute(): LearningRoute {
+    /**
+     * Fallback method - creates a default math route if Drive is unavailable
+     */
+    private fun createFallbackMathRoute(): LearningRoute {
         return LearningRoute(
             id = "math_route",
             subject = "Mathematics",
@@ -307,22 +404,22 @@ class RPGRepository(context: Context) {
     }
 
     private suspend fun createDemoAccounts() {
-        // Create 10 demo accounts for leaderboard
+        // Create 10 demo accounts for leaderboard - all starting fresh with 0 XP
         val demoAccounts = listOf(
             KnightProfile(
                 "1",
                 "STU001",
                 SecurityUtils.hashPassword("password123"),
                 "Arthur Pendragon",
-                KnightRank.HERO,
-                850,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer", "Sorceress", "Titan", "Phantom", "Dragon", "Demon Lord"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Diamond Sword",
-                "Legendary Armor",
+                "Wooden Sword",
+                "Cloth Armor",
                 "arthur@example.com",
                 "123-456-7890",
                 "North Kingdom"
@@ -332,15 +429,15 @@ class RPGRepository(context: Context) {
                 "STU002",
                 SecurityUtils.hashPassword("password123"),
                 "Lancelot the Brave",
-                KnightRank.KNIGHT,
-                520,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer", "Sorceress", "Titan"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Golden Sword",
-                "Steel Armor",
+                "Wooden Sword",
+                "Cloth Armor",
                 "lancelot@example.com",
                 "",
                 "East Empire"
@@ -350,15 +447,15 @@ class RPGRepository(context: Context) {
                 "STU003",
                 SecurityUtils.hashPassword("password123"),
                 "Guinevere",
-                KnightRank.KNIGHT,
-                480,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer", "Sorceress", "Titan"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Golden Sword",
-                "Enchanted Robes",
+                "Wooden Sword",
+                "Cloth Armor",
                 "guin@example.com",
                 "",
                 "West Realm"
@@ -368,15 +465,15 @@ class RPGRepository(context: Context) {
                 "STU004",
                 SecurityUtils.hashPassword("password123"),
                 "Merlin the Wise",
-                KnightRank.SQUIRE,
-                280,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer", "Sorceress"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Iron Sword",
-                "Mage Robes",
+                "Wooden Sword",
+                "Cloth Armor",
                 "",
                 "",
                 "South Dominion"
@@ -386,15 +483,15 @@ class RPGRepository(context: Context) {
                 "STU005",
                 SecurityUtils.hashPassword("password123"),
                 "Gawain",
-                KnightRank.SQUIRE,
-                245,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer", "Sorceress"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Iron Sword",
-                "Leather Armor",
+                "Wooden Sword",
+                "Cloth Armor",
                 "",
                 "",
                 "North Kingdom"
@@ -404,15 +501,15 @@ class RPGRepository(context: Context) {
                 "STU006",
                 SecurityUtils.hashPassword("password123"),
                 "Tristan",
-                KnightRank.SQUIRE,
-                220,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Iron Sword",
-                "Leather Armor",
+                "Wooden Sword",
+                "Cloth Armor",
                 "",
                 "",
                 "East Empire"
@@ -422,14 +519,14 @@ class RPGRepository(context: Context) {
                 "STU007",
                 SecurityUtils.hashPassword("password123"),
                 "Isolde",
-                KnightRank.SQUIRE,
-                180,
+                KnightRank.NOVICE,
+                0,
                 100,
                 100,
-                listOf("Necromancer"),
+                emptyList(),
                 listOf("math_route"),
                 emptyList(),
-                "Iron Sword",
+                "Wooden Sword",
                 "Cloth Armor",
                 "",
                 "",
@@ -441,7 +538,7 @@ class RPGRepository(context: Context) {
                 SecurityUtils.hashPassword("password123"),
                 "Percival",
                 KnightRank.NOVICE,
-                85,
+                0,
                 100,
                 100,
                 emptyList(),
@@ -459,14 +556,14 @@ class RPGRepository(context: Context) {
                 SecurityUtils.hashPassword("password123"),
                 "Galahad",
                 KnightRank.NOVICE,
-                60,
+                0,
                 100,
                 100,
                 emptyList(),
                 listOf("math_route"),
                 emptyList(),
                 "Wooden Sword",
-                "Leather Armor",
+                "Cloth Armor",
                 "",
                 "",
                 "North Kingdom"
@@ -477,7 +574,7 @@ class RPGRepository(context: Context) {
                 SecurityUtils.hashPassword("password123"),
                 "Bedivere",
                 KnightRank.NOVICE,
-                40,
+                0,
                 100,
                 100,
                 emptyList(),
@@ -492,6 +589,27 @@ class RPGRepository(context: Context) {
         )
 
         demoAccounts.forEach { studentDao.insertStudent(it) }
+    }
+
+    suspend fun clearAllStudents() {
+        studentDao.clearAllStudents()
+        _knightProfile.value = null
+    }
+
+    suspend fun clearAllRoutes() {
+        studentDao.clearAllRoutes()
+        _learningRoutes.value = emptyList()
+    }
+
+    suspend fun clearAllData() {
+        studentDao.clearAllData()
+        _knightProfile.value = null
+        _learningRoutes.value = emptyList()
+    }
+
+    suspend fun resetDatabase() {
+        clearAllData()
+        initializeDatabase() // Re-populate with demo data and fetch from Drive
     }
 
     companion object {

@@ -58,4 +58,17 @@ interface StudentDao {
     suspend fun insertAllRoutes(routes: List<LearningRoute>) {
         routes.forEach { insertRoute(it) }
     }
+
+    // Clear database methods
+    @Query("DELETE FROM knight_profiles")
+    suspend fun clearAllStudents()
+
+    @Query("DELETE FROM learning_routes")
+    suspend fun clearAllRoutes()
+
+    @Transaction
+    suspend fun clearAllData() {
+        clearAllStudents()
+        clearAllRoutes()
+    }
 }
